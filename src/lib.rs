@@ -11,16 +11,23 @@ static DEFAULT_BORDER_BEHAVIOR: BorderOpt = BorderOpt::Solid;
 const FILE_LIVE_CHAR: u8 = b'#';
 const FILE_DEAD_CHAR: u8 = b'_';
 
+/// Border options
 #[derive(Debug, Clone, PartialEq)]
 pub enum BorderOpt {
+    /// Consider the border as "alive"
     Solid,
+    /// Consider the border as "dead"
     Empty,
+    /// Consider the border as the opposite side of the board
     Loop,
 }
 
+/// A simple cell
 #[derive(Debug, Clone, PartialEq)]
 pub enum Cell {
+    /// The cell is alive (true)
     Alive,
+    /// The cell is dead (false)
     Dead,
 }
 
@@ -34,16 +41,17 @@ impl Display for Cell {
     }
 }
 
+/// A Game of Life Board
 #[derive(Debug, Clone, PartialEq)]
 pub struct Board {
+    /// The height and width of the board
     pub size: usize,
+    /// The cells themselves
     pub cells: Vec<Vec<Cell>>,
+    /// The border behavior
     pub border: BorderOpt,
 }
 
-/**
- * Public methods
- */
 impl Board {
     /// Initialize a new board
     pub fn new(size: Option<usize>, border: Option<BorderOpt>) -> Self {
@@ -56,6 +64,12 @@ impl Board {
         }
     }
 
+    /// Initialize new board from the file at `path`. The file should
+    /// only consist of sequences of `#` (alive) and `_` (dead)
+    /// characters where each row is delimited by new-lines.
+    ///
+    /// **Warning:** Assumes the dimensions are square and match the
+    /// length of the first line of input
     pub fn new_from_file(path: &Path) -> Self {
         let file = match File::open(&path) {
             Err(why) => panic!("Error opening file{}: {}", path.display(), why),
