@@ -1,9 +1,3 @@
-/* Rules:
- * - Any live cell with two or three live neighbours survives.
- * - Any dead cell with three live neighbours becomes a live cell.
- * - All other live cells die in the next generation. Similarly, all other dead cells stay dead.
- */
-
 use std::fmt::{self, Debug, Display, Formatter};
 
 static DEFAULT_BOARD_SIZE: usize = 10;
@@ -135,7 +129,6 @@ impl Board {
         match self.get_live_neighbor_count(x, y) {
             3 => true,
             2 => cell == Cell::Alive,
-            0 | 1 => false,
             _ => false,
         }
     }
@@ -241,7 +234,11 @@ mod tests {
     fn blinker_should_blink() {
         let mut board = get_blinker_board();
 
+        println!("{}", board);
+
         board.advance_cycle();
+
+        println!("{}", board);
 
         assert_eq!(
             format!("{}", board),
