@@ -241,13 +241,8 @@ mod tests {
     fn blinker_should_blink() {
         let mut board = get_blinker_board();
 
-        println!("{}", board);
-
         board.advance_cycle();
 
-        println!("{}", board);
-
-        panic!();
         assert_eq!(
             format!("{}", board),
             "░░░░░░\n\
