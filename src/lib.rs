@@ -1,7 +1,15 @@
-use std::fmt::{self, Debug, Display, Formatter};
+use std::{
+    fmt::{self, Debug, Display, Formatter},
+    fs::File,
+    io::{BufRead, BufReader},
+    path::Path,
+};
 
 static DEFAULT_BOARD_SIZE: usize = 10;
 static DEFAULT_BORDER_BEHAVIOR: BorderOpt = BorderOpt::Solid;
+
+const FILE_LIVE_CHAR: u8 = b'#';
+const FILE_DEAD_CHAR: u8 = b'_';
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum BorderOpt {
@@ -48,6 +56,30 @@ impl Board {
         }
     }
 
+    pub fn new_from_file(path: &Path) -> Self {
+        let file = match File::open(&path) {
+            Err(why) => panic!("Error opening file{}: {}", path.display(), why),
+            Ok(file) => file,
+        };
+        let mut size = 0;
+        let mut cells: Vec<Vec<Cell>> = vec![vec![]];
+
+        BufReader::new(file).lines().enumerate().for_each(|(i, l)| {
+            let l = l.unwrap();
+            if size == 0 {
+                size = l.len();
+                cells = vec![vec![Cell::Dead; size]; size];
+            }
+            cells[i] = Board::parse_str_as_cells(&l);
+        });
+
+        Board {
+            size,
+            cells,
+            border: BorderOpt::Empty,
+        }
+    }
+
     /// Toggle a cell's state
     pub fn toggle_cell(&mut self, x: usize, y: usize) {
         match (self.is_valid_pos(x, y), self.get_cell(x, y)) {
@@ -74,6 +106,11 @@ impl Board {
         for (x, y, cell) in updates {
             self.cells[x][y] = cell;
         }
+    }
+
+    /// Advance board state by n cycles
+    pub fn advance_n_cycles(&mut self, n: usize) {
+        (0..n).for_each(|_| self.advance_cycle())
     }
 }
 
@@ -132,6 +169,20 @@ impl Board {
             _ => false,
         }
     }
+
+    fn parse_str_as_cells(string: &str) -> Vec<Cell> {
+        let mut cells = vec![];
+
+        for c in string.bytes() {
+            match c {
+                FILE_LIVE_CHAR => cells.push(Cell::Alive),
+                FILE_DEAD_CHAR => cells.push(Cell::Dead),
+                _ => (),
+            }
+        }
+
+        cells
+    }
 }
 
 impl Display for Board {
@@ -178,6 +229,27 @@ mod tests {
         board.toggle_cell(2, 1);
 
         board
+    }
+
+    // ░░▓▓░░░░░░
+    // ░░░░▓▓░░░░
+    // ▓▓▓▓▓▓░░░░
+    // ░░░░░░░░░░
+    // ░░░░░░░░░░
+    fn get_glider_board() -> Board {
+        let mut board = Board::new(Some(5), Some(BorderOpt::Empty));
+
+        board.toggle_cell(0, 1);
+        board.toggle_cell(1, 2);
+        board.toggle_cell(2, 0);
+        board.toggle_cell(2, 1);
+        board.toggle_cell(2, 2);
+
+        board
+    }
+
+    fn get_file_board() -> Board {
+        Board::new_from_file(Path::new("./test.txt"))
     }
 
     #[test]
@@ -235,9 +307,7 @@ mod tests {
         let mut board = get_blinker_board();
 
         println!("{}", board);
-
         board.advance_cycle();
-
         println!("{}", board);
 
         assert_eq!(
@@ -247,5 +317,46 @@ mod tests {
              ░░░░░░\n"
                 .to_string()
         );
+
+        board.advance_cycle();
+        println!("{}", board);
+
+        assert_eq!(
+            format!("{}", board),
+            "░░▓▓░░\n\
+             ░░▓▓░░\n\
+             ░░▓▓░░\n"
+                .to_string()
+        );
+    }
+
+    #[test]
+    fn gilder_should_glide() {
+        let mut board = get_glider_board();
+        let expected = "\
+				░░░░░░░░░░\n\
+				░░░░░░░░░░\n\
+				░░░░░░▓▓░░\n\
+				░░░░░░░░▓▓\n\
+				░░░░▓▓▓▓▓▓\n";
+
+        board.advance_n_cycles(8); // 8 cycles to fully traverse board
+
+        println!("Expected:\n{}\nActual:\n{}", expected, board);
+        assert_eq!(format!("{}", board), expected.to_string());
+    }
+
+    #[test]
+    fn file_should_file() {
+        let board = get_file_board();
+        let expected = "\
+				░░░░░░░░░░\n\
+        ░░░░░░░░░░\n\
+        ░░░░░░▓▓░░\n\
+        ░░░░░░░░▓▓\n\
+				░░░░▓▓▓▓▓▓\n";
+
+        println!("Expected:\n{}\nActual:\n{}", expected, board);
+        assert_eq!(format!("{}", board), expected.to_string());
     }
 }
