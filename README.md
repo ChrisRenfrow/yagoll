@@ -9,7 +9,13 @@ It seemed like a good way to learn how to make a user-friendly Rust library. And
 
 ## TODO
 
-- [ ] Basic functionality
-  - [ ] Implement Game of Life rules
-  - [ ] Make border behavior configurable
-- [ ] TBD 
+- [x] Basic
+  - [x] Implement Game of Life rules
+  - [x] Make border behavior configurable
+  - [ ] Support rectangular board dimensions
+  - [x] Read board state from file
+  - [ ] Read board options (border behavior) from file
+- [ ] Extra
+  - [ ] Provide a range of pre-computed cycles
+  - [ ] Implement Iterable for Board
+  - [ ] Write board state to file
