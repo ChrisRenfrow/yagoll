@@ -334,11 +334,11 @@ mod tests {
     fn gilder_should_glide() {
         let mut board = get_glider_board();
         let expected = "\
-				░░░░░░░░░░\n\
-				░░░░░░░░░░\n\
-				░░░░░░▓▓░░\n\
-				░░░░░░░░▓▓\n\
-				░░░░▓▓▓▓▓▓\n";
+        ░░░░░░░░░░\n\
+        ░░░░░░░░░░\n\
+        ░░░░░░▓▓░░\n\
+        ░░░░░░░░▓▓\n\
+        ░░░░▓▓▓▓▓▓\n";
 
         board.advance_n_cycles(8); // 8 cycles to fully traverse board
 
@@ -350,11 +350,11 @@ mod tests {
     fn file_should_file() {
         let board = get_file_board();
         let expected = "\
-				░░░░░░░░░░\n\
+        ░░░░░░░░░░\n\
         ░░░░░░░░░░\n\
         ░░░░░░▓▓░░\n\
         ░░░░░░░░▓▓\n\
-				░░░░▓▓▓▓▓▓\n";
+        ░░░░▓▓▓▓▓▓\n";
 
         println!("Expected:\n{}\nActual:\n{}", expected, board);
         assert_eq!(format!("{}", board), expected.to_string());
