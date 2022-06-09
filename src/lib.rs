@@ -23,7 +23,7 @@ pub enum BorderOpt {
 }
 
 /// A simple cell
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Cell {
     /// The cell is alive (true)
     Alive,
@@ -107,19 +107,19 @@ impl Board {
     pub fn advance_cycle(&mut self) {
         let mut updates: Vec<(usize, usize, Cell)> = vec![];
 
-        for x in 0..self.size {
-            for y in 0..self.size {
-                match (self.cell_should_live(x, y), self.get_cell(x, y)) {
+        (0..self.size).for_each(|x| {
+            (0..self.size).for_each(
+                |y| match (self.cell_should_live(x, y), self.get_cell(x, y)) {
                     (true, Cell::Dead) => updates.push((x, y, Cell::Alive)),
                     (false, Cell::Alive) => updates.push((x, y, Cell::Dead)),
                     _ => (),
-                }
-            }
-        }
+                },
+            )
+        });
 
-        for (x, y, cell) in updates {
+        updates.iter().for_each(|&(x, y, cell)| {
             self.cells[x][y] = cell;
-        }
+        });
     }
 
     /// Advance board state by n cycles
@@ -135,35 +135,39 @@ impl Board {
 
     fn get_cell(&self, x: usize, y: usize) -> Cell {
         if self.is_valid_pos(x, y) {
-            self.cells[x][y].clone()
+            self.cells[x][y]
         } else {
             panic!("{}, {} not valid cell!", x, y);
         }
     }
 
     fn is_border(&self, x: i32, y: i32) -> bool {
-        let board_size = self.size as i32;
+        let size = self.size as i32;
 
-        (x < 0 || y < 0) || (x >= board_size || y >= board_size)
+        (x < 0 || y < 0) || (x >= size || y >= size)
     }
 
     fn get_live_neighbor_count(&self, x: usize, y: usize) -> usize {
         let cell = self.get_cell(x, y);
         let x = x as i32;
         let y = y as i32;
+
         let mut n = 0;
 
-        (x - 1..x + 2).for_each(|row| {
-            (y - 1..y + 2).for_each(|col| {
-                if self.is_border(row, col) {
+        // TODO: Refactor this out into another method which retrieves a slice of neighbors
+        (x - 1..x + 2).for_each(|x| {
+            (y - 1..y + 2).for_each(|y| {
+                n += if self.is_border(x, y) {
                     match self.border {
-                        BorderOpt::Solid => n += 1,
-                        BorderOpt::Empty => (),
-                        _ => (),
+                        BorderOpt::Solid => 1,
+                        BorderOpt::Empty => 0,
+                        _ => 0,
                     }
-                } else if self.get_cell(row as usize, col as usize) == Cell::Alive {
-                    n += 1;
-                }
+                } else if self.get_cell(x as usize, y as usize) == Cell::Alive {
+                    1
+                } else {
+                    0
+                };
             });
         });
 
@@ -185,29 +189,25 @@ impl Board {
     }
 
     fn parse_str_as_cells(string: &str) -> Vec<Cell> {
-        let mut cells = vec![];
-
-        for c in string.bytes() {
-            match c {
-                FILE_LIVE_CHAR => cells.push(Cell::Alive),
-                FILE_DEAD_CHAR => cells.push(Cell::Dead),
-                _ => (),
-            }
-        }
-
-        cells
+        string
+            .bytes()
+            .map(|c| match c {
+                FILE_LIVE_CHAR => Cell::Alive,
+                FILE_DEAD_CHAR => Cell::Dead,
+                _ => Cell::Dead,
+            })
+            .collect::<Vec<Cell>>()
     }
 }
 
 impl Display for Board {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        let cells = &self.cells;
-        for r in cells {
-            for c in r {
-                write!(f, "{}", c)?;
-            }
-            writeln!(f)?;
-        }
+        self.cells.iter().for_each(|x| {
+            x.iter().for_each(|c| {
+                write!(f, "{}", c).unwrap();
+            });
+            writeln!(f).unwrap();
+        });
         write!(f, "")
     }
 }
