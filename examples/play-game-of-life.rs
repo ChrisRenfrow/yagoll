@@ -32,5 +32,4 @@ fn main() {
         board.advance_cycle();
         thread::sleep(time::Duration::from_millis(delay));
     });
-    println!();
 }
