@@ -49,6 +49,10 @@ pub struct Board<const WIDTH: usize, const HEIGHT: usize> {
 
 impl<const WIDTH: usize, const HEIGHT: usize> Board<WIDTH, HEIGHT> {
     /// Initialize a new board
+    ///
+    /// # Usage:
+    ///
+    /// `Board::<X, Y>::new(BorderOpt::Empty)`
     pub fn new(border: BorderOpt) -> Self {
         Board {
             border,
@@ -56,13 +60,24 @@ impl<const WIDTH: usize, const HEIGHT: usize> Board<WIDTH, HEIGHT> {
         }
     }
 
-    /// Initialize new board from the file at `path`. The file should
-    /// only consist of sequences of `#` (alive) and `_` (dead)
-    /// characters where each row is delimited by new-lines.
+    /// Initialize new board from the file at `path`.
     ///
-    /// **Panics:**
+    /// # File format:
+    ///
+    /// The file should start with one of the
+    /// following border options:
+    ///
+    /// - `empty`
+    /// - `solid`
+    ///
+    /// Followed by lines consisting of `#` (alive) and `_` (dead)
+    /// characters.
+    ///
+    /// # Panics:
+    ///
     /// - If the file is invalid or non-existent
-    /// - If the width is inconsistent
+    /// - If the length of a line doesn't match `WIDTH`
+    /// - If the number of lines exceeds `HEIGHT`
     pub fn new_from_file(path: &Path) -> Self {
         let file = match File::open(&path) {
             Err(why) => panic!("Error opening file{}: {}", path.display(), why),
@@ -108,9 +123,10 @@ impl<const WIDTH: usize, const HEIGHT: usize> Board<WIDTH, HEIGHT> {
         (0..n).for_each(|_| self.advance_cycle())
     }
 
-    /// Set cell at x and y
+    /// Set cell at `x` and `y` to state `c`
     ///
-    /// **Panics:**
+    /// # Panics:
+    ///
     /// If `x` or `y` are out of range
     pub fn set(&mut self, x: usize, y: usize, c: Cell) {
         self.cells[x][y] = c;
@@ -118,7 +134,8 @@ impl<const WIDTH: usize, const HEIGHT: usize> Board<WIDTH, HEIGHT> {
 
     /// Get cell at `x` and `y`
     ///
-    /// **Panics:**
+    /// # Panics:
+    ///
     /// If `x` or `y` are out of range
     pub fn get(&self, x: usize, y: usize) -> Cell {
         self.cells[x][y]
@@ -126,10 +143,6 @@ impl<const WIDTH: usize, const HEIGHT: usize> Board<WIDTH, HEIGHT> {
 }
 
 impl<const WIDTH: usize, const HEIGHT: usize> Board<WIDTH, HEIGHT> {
-    fn is_valid_pos(&self, x: usize, y: usize) -> bool {
-        x < WIDTH && y < HEIGHT
-    }
-
     fn is_border(&self, x: i32, y: i32) -> bool {
         (x < 0 || y < 0) || (x >= WIDTH as i32 || y >= HEIGHT as i32)
     }
