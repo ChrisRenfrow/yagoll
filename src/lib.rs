@@ -68,25 +68,22 @@ impl<const WIDTH: usize, const HEIGHT: usize> Board<WIDTH, HEIGHT> {
             Err(why) => panic!("Error opening file{}: {}", path.display(), why),
             Ok(file) => file,
         };
-        let mut width = 0;
         let mut cells = [[Cell::Dead; WIDTH]; HEIGHT];
+        let mut line_iter = BufReader::new(file).lines();
+        let border_str = line_iter.next().unwrap().unwrap();
+        let border = Self::parse_str_as_border_opt(&border_str).unwrap_or(BorderOpt::Empty);
 
-        BufReader::new(file).lines().enumerate().for_each(|(i, l)| {
+        line_iter.enumerate().for_each(|(i, l)| {
             let l = l.unwrap();
             let l = l.trim();
-            if width == 0 {
-                width = l.len();
-            } else if width != l.len() {
-                panic!("width of line {} is {}, expected {}", i + 1, l.len(), width);
+            if WIDTH != l.len() {
+                panic!("width of line {} is {}, expected {}", i + 1, l.len(), WIDTH);
             }
 
             cells[i] = Self::parse_str_as_cells(l);
         });
 
-        Board {
-            cells,
-            border: BorderOpt::Empty,
-        }
+        Board { cells, border }
     }
 
     /// Advance board state by one cycle
@@ -190,6 +187,14 @@ impl<const WIDTH: usize, const HEIGHT: usize> Board<WIDTH, HEIGHT> {
         });
 
         cell_row
+    }
+
+    fn parse_str_as_border_opt(string: &str) -> Option<BorderOpt> {
+        match string {
+            "solid" => Some(BorderOpt::Solid),
+            "empty" => Some(BorderOpt::Empty),
+            _ => None,
+        }
     }
 }
 
@@ -395,6 +400,10 @@ mod tests {
         ░░░░░░▓▓░░\n\
         ░░░░░░░░▓▓\n\
         ░░░░▓▓▓▓▓▓\n";
+
+        println!("{:?}", board);
+
+        assert!(board.border == BorderOpt::Empty);
 
         println!("Expected:\n{}\nActual:\n{}", expected, board);
         assert_eq!(format!("{}", board), expected.to_string());
