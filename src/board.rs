@@ -59,7 +59,7 @@ impl<const WIDTH: usize, const HEIGHT: usize> Board<WIDTH, HEIGHT> {
     /// # Panics:
     ///
     /// - If the file is invalid or non-existent
-    /// - If the length of a line doesn't match `WIDTH`
+    /// - If the length of a line exceeds `WIDTH`
     /// - If the number of lines exceeds `HEIGHT`
     pub fn new_from_file(path: &Path) -> Self {
         let file = match File::open(&path) {
@@ -74,10 +74,6 @@ impl<const WIDTH: usize, const HEIGHT: usize> Board<WIDTH, HEIGHT> {
         line_iter.enumerate().for_each(|(i, l)| {
             let l = l.unwrap();
             let l = l.trim();
-            if WIDTH != l.len() {
-                panic!("width of line {} is {}, expected {}", i + 1, l.len(), WIDTH);
-            }
-
             cells[i] = Self::parse_str_as_cells(l);
         });
 
@@ -276,7 +272,7 @@ mod board_tests {
         Board::new_from_file(Path::new("./test.txt"))
     }
 
-    fn get_bad_file_board() -> Board<5, 3> {
+    fn get_bad_file_board() -> Board<3, 3> {
         Board::new_from_file(Path::new("./bad-test.txt"))
     }
 
@@ -299,9 +295,9 @@ mod board_tests {
         assert_eq!(
             format!("{}", board),
             "▓▓░░░░░░\n\
-                 ░░▓▓░░░░\n\
-                 ░░░░▓▓░░\n\
-                 ░░░░░░▓▓\n"
+             ░░▓▓░░░░\n\
+             ░░░░▓▓░░\n\
+             ░░░░░░▓▓\n"
                 .to_string()
         );
     }
@@ -340,8 +336,8 @@ mod board_tests {
         assert_eq!(
             format!("{}", board),
             "░░░░░░\n\
-                 ▓▓▓▓▓▓\n\
-                 ░░░░░░\n"
+             ▓▓▓▓▓▓\n\
+             ░░░░░░\n"
                 .to_string()
         );
 
@@ -351,8 +347,8 @@ mod board_tests {
         assert_eq!(
             format!("{}", board),
             "░░▓▓░░\n\
-                 ░░▓▓░░\n\
-                 ░░▓▓░░\n"
+             ░░▓▓░░\n\
+             ░░▓▓░░\n"
                 .to_string()
         );
     }
@@ -361,11 +357,11 @@ mod board_tests {
     fn gilder_should_glide() {
         let mut board = get_glider_board();
         let expected = "\
-            ░░░░░░░░░░\n\
-            ░░░░░░░░░░\n\
-            ░░░░░░▓▓░░\n\
-            ░░░░░░░░▓▓\n\
-            ░░░░▓▓▓▓▓▓\n";
+        ░░░░░░░░░░\n\
+        ░░░░░░░░░░\n\
+        ░░░░░░▓▓░░\n\
+        ░░░░░░░░▓▓\n\
+        ░░░░▓▓▓▓▓▓\n";
 
         board.advance_n_cycles(8); // 8 cycles to fully traverse board
 
@@ -377,9 +373,9 @@ mod board_tests {
     fn rectangle_should_rectangle() {
         let board = get_rectangular_board();
         let expected = "\
-            ░░░░░░░░░░\n\
-            ░░▓▓▓▓▓▓░░\n\
-            ░░░░░░░░░░\n";
+        ░░░░░░░░░░\n\
+        ░░▓▓▓▓▓▓░░\n\
+        ░░░░░░░░░░\n";
 
         println!("{:#?}", board);
 
@@ -391,11 +387,11 @@ mod board_tests {
     fn file_should_file() {
         let board = get_file_board();
         let expected = "\
-            ░░░░░░░░░░\n\
-            ░░░░░░░░░░\n\
-            ░░░░░░▓▓░░\n\
-            ░░░░░░░░▓▓\n\
-            ░░░░▓▓▓▓▓▓\n";
+        ░░░░░░░░░░\n\
+        ░░░░░░░░░░\n\
+        ░░░░░░▓▓░░\n\
+        ░░░░░░░░▓▓\n\
+        ░░░░▓▓▓▓▓▓\n";
 
         println!("{:?}", board);
 
