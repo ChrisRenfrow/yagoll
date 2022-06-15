@@ -5,9 +5,6 @@ use std::{
     path::Path,
 };
 
-static DEFAULT_BOARD_SIZE: usize = 10;
-static DEFAULT_BORDER_BEHAVIOR: BorderOpt = BorderOpt::Solid;
-
 const FILE_LIVE_CHAR: u8 = b'#';
 const FILE_DEAD_CHAR: u8 = b'_';
 
@@ -43,24 +40,19 @@ impl Display for Cell {
 
 /// A Game of Life Board
 #[derive(Debug, Clone, PartialEq)]
-pub struct Board {
-    /// The height and width of the board
-    pub size: usize,
-    /// The cells themselves
-    pub cells: Vec<Vec<Cell>>,
+pub struct Board<const WIDTH: usize, const HEIGHT: usize> {
+    /// 2-dimensional array of Cells
+    pub cells: [[Cell; WIDTH]; HEIGHT],
     /// The border behavior
     pub border: BorderOpt,
 }
 
-impl Board {
+impl<const WIDTH: usize, const HEIGHT: usize> Board<WIDTH, HEIGHT> {
     /// Initialize a new board
-    pub fn new(size: Option<usize>, border: Option<BorderOpt>) -> Self {
-        let size = size.unwrap_or(DEFAULT_BOARD_SIZE);
-        let border = border.unwrap_or_else(|| DEFAULT_BORDER_BEHAVIOR.clone());
+    pub fn new(border: BorderOpt) -> Self {
         Board {
-            size,
             border,
-            cells: vec![vec![Cell::Dead; size]; size],
+            cells: [[Cell::Dead; WIDTH]; HEIGHT],
         }
     }
 
@@ -68,38 +60,32 @@ impl Board {
     /// only consist of sequences of `#` (alive) and `_` (dead)
     /// characters where each row is delimited by new-lines.
     ///
-    /// **Warning:** Assumes the dimensions are square and match the
-    /// length of the first line of input
+    /// **Panics:**
+    /// - If the file is invalid or non-existent
+    /// - If the width is inconsistent
     pub fn new_from_file(path: &Path) -> Self {
         let file = match File::open(&path) {
             Err(why) => panic!("Error opening file{}: {}", path.display(), why),
             Ok(file) => file,
         };
-        let mut size = 0;
-        let mut cells: Vec<Vec<Cell>> = vec![vec![]];
+        let mut width = 0;
+        let mut cells = [[Cell::Dead; WIDTH]; HEIGHT];
 
         BufReader::new(file).lines().enumerate().for_each(|(i, l)| {
             let l = l.unwrap();
-            if size == 0 {
-                size = l.len();
-                cells = vec![vec![Cell::Dead; size]; size];
+            let l = l.trim();
+            if width == 0 {
+                width = l.len();
+            } else if width != l.len() {
+                panic!("Width of line {} is {}, expected {}!", i, l.len(), width);
             }
-            cells[i] = Board::parse_str_as_cells(&l);
+
+            cells[i] = Self::parse_str_as_cells(l);
         });
 
         Board {
-            size,
             cells,
             border: BorderOpt::Empty,
-        }
-    }
-
-    /// Toggle a cell's state
-    pub fn toggle_cell(&mut self, x: usize, y: usize) {
-        match (self.is_valid_pos(x, y), self.get_cell(x, y)) {
-            (true, Cell::Alive) => self.cells[x][y] = Cell::Dead,
-            (true, Cell::Dead) => self.cells[x][y] = Cell::Alive,
-            _ => (),
         }
     }
 
@@ -107,18 +93,16 @@ impl Board {
     pub fn advance_cycle(&mut self) {
         let mut updates: Vec<(usize, usize, Cell)> = vec![];
 
-        (0..self.size).for_each(|x| {
-            (0..self.size).for_each(
-                |y| match (self.cell_should_live(x, y), self.get_cell(x, y)) {
-                    (true, Cell::Dead) => updates.push((x, y, Cell::Alive)),
-                    (false, Cell::Alive) => updates.push((x, y, Cell::Dead)),
-                    _ => (),
-                },
-            )
+        (0..WIDTH).for_each(|x| {
+            (0..HEIGHT).for_each(|y| match (self.cell_should_live(x, y), self.get(x, y)) {
+                (true, Cell::Dead) => updates.push((x, y, Cell::Alive)),
+                (false, Cell::Alive) => updates.push((x, y, Cell::Dead)),
+                _ => (),
+            })
         });
 
         updates.iter().for_each(|&(x, y, cell)| {
-            self.cells[x][y] = cell;
+            self.set(x, y, cell);
         });
     }
 
@@ -126,29 +110,35 @@ impl Board {
     pub fn advance_n_cycles(&mut self, n: usize) {
         (0..n).for_each(|_| self.advance_cycle())
     }
-}
 
-impl Board {
-    fn is_valid_pos(&self, x: usize, y: usize) -> bool {
-        x < self.size && y < self.size
+    /// Set cell at x and y
+    ///
+    /// **Panics:**
+    /// If `x` or `y` are out of range
+    pub fn set(&mut self, x: usize, y: usize, c: Cell) {
+        self.cells[x][y] = c;
     }
 
-    fn get_cell(&self, x: usize, y: usize) -> Cell {
-        if self.is_valid_pos(x, y) {
-            self.cells[x][y]
-        } else {
-            panic!("{}, {} not valid cell!", x, y);
-        }
+    /// Get cell at `x` and `y`
+    ///
+    /// **Panics:**
+    /// If `x` or `y` are out of range
+    pub fn get(&self, x: usize, y: usize) -> Cell {
+        self.cells[x][y]
+    }
+}
+
+impl<const WIDTH: usize, const HEIGHT: usize> Board<WIDTH, HEIGHT> {
+    fn is_valid_pos(&self, x: usize, y: usize) -> bool {
+        x < WIDTH && y < HEIGHT
     }
 
     fn is_border(&self, x: i32, y: i32) -> bool {
-        let size = self.size as i32;
-
-        (x < 0 || y < 0) || (x >= size || y >= size)
+        (x < 0 || y < 0) || (x >= WIDTH as i32 || y >= HEIGHT as i32)
     }
 
     fn get_live_neighbor_count(&self, x: usize, y: usize) -> usize {
-        let cell = self.get_cell(x, y);
+        let cell = self.get(x, y);
         let x = x as i32;
         let y = y as i32;
 
@@ -163,7 +153,7 @@ impl Board {
                         BorderOpt::Empty => 0,
                         _ => 0,
                     }
-                } else if self.get_cell(x as usize, y as usize) == Cell::Alive {
+                } else if self.get(x as usize, y as usize) == Cell::Alive {
                     1
                 } else {
                     0
@@ -179,7 +169,7 @@ impl Board {
     }
 
     fn cell_should_live(&self, x: usize, y: usize) -> bool {
-        let cell = self.get_cell(x, y);
+        let cell = self.get(x, y);
 
         match self.get_live_neighbor_count(x, y) {
             3 => true,
@@ -188,19 +178,28 @@ impl Board {
         }
     }
 
-    fn parse_str_as_cells(string: &str) -> Vec<Cell> {
-        string
-            .bytes()
-            .map(|c| match c {
+    fn parse_str_as_cells(string: &str) -> [Cell; WIDTH] {
+        let mut cell_row = [Cell::Dead; WIDTH];
+
+        string.bytes().enumerate().for_each(|(i, c)| {
+            cell_row[i] = match c {
                 FILE_LIVE_CHAR => Cell::Alive,
                 FILE_DEAD_CHAR => Cell::Dead,
                 _ => Cell::Dead,
-            })
-            .collect::<Vec<Cell>>()
+            }
+        });
+
+        cell_row
     }
 }
 
-impl Display for Board {
+impl<const WIDTH: usize, const HEIGHT: usize> Default for Board<WIDTH, HEIGHT> {
+    fn default() -> Self {
+        Board::<WIDTH, HEIGHT>::new(BorderOpt::Empty)
+    }
+}
+
+impl<const WIDTH: usize, const HEIGHT: usize> Display for Board<WIDTH, HEIGHT> {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         self.cells.iter().for_each(|x| {
             x.iter().for_each(|c| {
@@ -221,13 +220,13 @@ mod tests {
     // ░░▓▓░░░░
     // ░░░░▓▓░░
     // ░░░░░░▓▓
-    fn get_4x4_board() -> Board {
-        let mut board = Board::new(Some(4), Some(BorderOpt::Empty));
+    fn get_4x4_board() -> Board<4, 4> {
+        let mut board = Board::<4, 4>::new(BorderOpt::Empty);
 
-        board.toggle_cell(0, 0);
-        board.toggle_cell(1, 1);
-        board.toggle_cell(2, 2);
-        board.toggle_cell(3, 3);
+        board.set(0, 0, Cell::Alive);
+        board.set(1, 1, Cell::Alive);
+        board.set(2, 2, Cell::Alive);
+        board.set(3, 3, Cell::Alive);
 
         board
     }
@@ -235,12 +234,12 @@ mod tests {
     // ░░▓▓░░
     // ░░▓▓░░
     // ░░▓▓░░
-    fn get_blinker_board() -> Board {
-        let mut board = Board::new(Some(3), Some(BorderOpt::Empty));
+    fn get_blinker_board() -> Board<3, 3> {
+        let mut board = Board::<3, 3>::new(BorderOpt::Empty);
 
-        board.toggle_cell(0, 1);
-        board.toggle_cell(1, 1);
-        board.toggle_cell(2, 1);
+        board.set(0, 1, Cell::Alive);
+        board.set(1, 1, Cell::Alive);
+        board.set(2, 1, Cell::Alive);
 
         board
     }
@@ -250,31 +249,40 @@ mod tests {
     // ▓▓▓▓▓▓░░░░
     // ░░░░░░░░░░
     // ░░░░░░░░░░
-    fn get_glider_board() -> Board {
-        let mut board = Board::new(Some(5), Some(BorderOpt::Empty));
+    fn get_glider_board() -> Board<5, 5> {
+        let mut board = Board::<5, 5>::new(BorderOpt::Empty);
 
-        board.toggle_cell(0, 1);
-        board.toggle_cell(1, 2);
-        board.toggle_cell(2, 0);
-        board.toggle_cell(2, 1);
-        board.toggle_cell(2, 2);
+        board.set(0, 1, Cell::Alive);
+        board.set(1, 2, Cell::Alive);
+        board.set(2, 0, Cell::Alive);
+        board.set(2, 1, Cell::Alive);
+        board.set(2, 2, Cell::Alive);
 
         board
     }
 
-    fn get_file_board() -> Board {
+    fn get_rectangular_board() -> Board<5, 3> {
+        let mut board = Board::<5, 3>::new(BorderOpt::Empty);
+
+        board.set(1, 1, Cell::Alive);
+        board.set(1, 2, Cell::Alive);
+        board.set(1, 3, Cell::Alive);
+
+        board
+    }
+
+    fn get_file_board() -> Board<5, 5> {
         Board::new_from_file(Path::new("./test.txt"))
     }
 
     #[test]
     fn init_default_board() {
-        let board = Board::new(None, None);
+        let board = Board::<10, 10>::default();
         assert_eq!(
             board,
-            Board {
-                size: DEFAULT_BOARD_SIZE,
-                border: DEFAULT_BORDER_BEHAVIOR.clone(),
-                cells: vec![vec![Cell::Dead; DEFAULT_BOARD_SIZE]; DEFAULT_BOARD_SIZE]
+            Board::<10, 10> {
+                border: BorderOpt::Empty,
+                cells: [[Cell::Dead; 10]; 10]
             }
         );
     }
@@ -355,6 +363,20 @@ mod tests {
         ░░░░▓▓▓▓▓▓\n";
 
         board.advance_n_cycles(8); // 8 cycles to fully traverse board
+
+        println!("Expected:\n{}\nActual:\n{}", expected, board);
+        assert_eq!(format!("{}", board), expected.to_string());
+    }
+
+    #[test]
+    fn rectangle_should_rectangle() {
+        let board = get_rectangular_board();
+        let expected = "\
+        ░░░░░░░░░░\n\
+        ░░▓▓▓▓▓▓░░\n\
+        ░░░░░░░░░░\n";
+
+        println!("{:#?}", board);
 
         println!("Expected:\n{}\nActual:\n{}", expected, board);
         assert_eq!(format!("{}", board), expected.to_string());
