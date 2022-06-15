@@ -77,7 +77,7 @@ impl<const WIDTH: usize, const HEIGHT: usize> Board<WIDTH, HEIGHT> {
             if width == 0 {
                 width = l.len();
             } else if width != l.len() {
-                panic!("Width of line {} is {}, expected {}!", i, l.len(), width);
+                panic!("width of line {} is {}, expected {}", i + 1, l.len(), width);
             }
 
             cells[i] = Self::parse_str_as_cells(l);
@@ -275,6 +275,10 @@ mod tests {
         Board::new_from_file(Path::new("./test.txt"))
     }
 
+    fn get_bad_file_board() -> Board<5, 3> {
+        Board::new_from_file(Path::new("./bad-test.txt"))
+    }
+
     #[test]
     fn init_default_board() {
         let board = Board::<10, 10>::default();
@@ -394,5 +398,11 @@ mod tests {
 
         println!("Expected:\n{}\nActual:\n{}", expected, board);
         assert_eq!(format!("{}", board), expected.to_string());
+    }
+
+    #[test]
+    #[should_panic]
+    fn bad_file() {
+        get_bad_file_board();
     }
 }
