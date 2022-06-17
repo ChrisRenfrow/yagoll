@@ -1,5 +1,6 @@
 [package]
-name = "game-of-life"
+name = "yagoll"
+description = "Yet Another Game of Life Library - A toy-ish library for initializing and interacting with Conway's Game of Life"
 version = "0.1.0"
 authors = ["Chris Renfrow <dev@chrisrenfrow.me>"]
 edition = "2018"

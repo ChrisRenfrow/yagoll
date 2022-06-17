@@ -209,7 +209,7 @@ impl<const WIDTH: usize, const HEIGHT: usize> Display for Board<WIDTH, HEIGHT> {
 }
 
 #[cfg(test)]
-mod board_tests {
+mod tests {
 
     use super::*;
 
