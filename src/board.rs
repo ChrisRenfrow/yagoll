@@ -269,11 +269,11 @@ mod tests {
     }
 
     fn get_file_board() -> Board<5, 5> {
-        Board::new_from_file(Path::new("./test.txt"))
+        Board::new_from_file(Path::new("./tests/test-boards/glider.txt"))
     }
 
     fn get_bad_file_board() -> Board<3, 3> {
-        Board::new_from_file(Path::new("./bad-test.txt"))
+        Board::new_from_file(Path::new("./tests/test-boards/bad-test.txt"))
     }
 
     #[test]
@@ -388,10 +388,10 @@ mod tests {
         let board = get_file_board();
         let expected = "\
         ░░░░░░░░░░\n\
-        ░░░░░░░░░░\n\
+        ░░░░▓▓░░░░\n\
         ░░░░░░▓▓░░\n\
-        ░░░░░░░░▓▓\n\
-        ░░░░▓▓▓▓▓▓\n";
+        ░░▓▓▓▓▓▓░░\n\
+        ░░░░░░░░░░\n";
 
         println!("{:?}", board);
 
