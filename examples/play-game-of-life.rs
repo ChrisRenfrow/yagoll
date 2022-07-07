@@ -1,4 +1,4 @@
-use std::{env, path::Path, thread, time};
+use std::{env, thread, time};
 
 use yagoll::Board;
 
@@ -6,9 +6,7 @@ fn main() {
     let path = env::args()
         .nth(1)
         .expect("No path to game of life file provided!");
-    let path = Path::new(&path[..]);
-    assert!(path.exists() && path.is_file());
-    println!("Path: {}", path.display());
+    println!("Path: {}", path);
 
     let num_cycles: usize = env::args()
         .nth(2)
@@ -24,8 +22,8 @@ fn main() {
         .unwrap();
     println!("Delay in ms: {}", delay);
 
-    let mut board: Board<40, 40> = Board::new_from_file(path);
-    println!("Board from {}:\n{}", path.display(), board);
+    let mut board = Board::new_from_file(&path);
+    println!("Board from {}:\n{}", path, board);
 
     (0..num_cycles + 1).for_each(|i| {
         println!("Cycle: {}/{}\n{}", i, num_cycles, board);

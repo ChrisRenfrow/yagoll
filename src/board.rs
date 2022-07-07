@@ -11,7 +11,7 @@ const FILE_LIVE_CHAR: u8 = b'#';
 const FILE_DEAD_CHAR: u8 = b'_';
 
 /// Border options
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BorderOpt {
     /// Consider the border as "alive"
     Solid,
@@ -23,23 +23,35 @@ pub enum BorderOpt {
 
 /// A Game of Life Board
 #[derive(Debug, Clone, PartialEq)]
-pub struct Board<const WIDTH: usize, const HEIGHT: usize> {
-    /// 2-dimensional array of Cells
-    pub cells: [[Cell; WIDTH]; HEIGHT],
+pub struct Board {
+    /// The width of the board
+    pub width: usize,
+    /// The height of the board
+    pub height: usize,
     /// The border behavior
     pub border: BorderOpt,
+    /// Private array of Cells
+    cells: Vec<Cell>,
 }
 
-impl<const WIDTH: usize, const HEIGHT: usize> Board<WIDTH, HEIGHT> {
+impl Board {
     /// Initialize a new board
     ///
-    /// # Usage:
+    /// # Example:
     ///
-    /// `Board::<X, Y>::new(BorderOpt::Empty)`
-    pub fn new(border: BorderOpt) -> Self {
+    /// ```
+    /// use yagoll::*;
+    ///
+    /// let mut board = Board::new(5, 5, BorderOpt::Empty);
+    /// assert!(board.width == 5 && board.height == 5 && board.border == BorderOpt::Empty);
+    /// assert_eq!(board.get(2,2), Cell::Dead);
+    /// ```
+    pub fn new(width: usize, height: usize, border: BorderOpt) -> Self {
         Board {
+            width,
+            height,
             border,
-            cells: [[Cell::Dead; WIDTH]; HEIGHT],
+            cells: vec![Cell::Dead; width * height],
         }
     }
 
@@ -59,33 +71,53 @@ impl<const WIDTH: usize, const HEIGHT: usize> Board<WIDTH, HEIGHT> {
     /// # Panics:
     ///
     /// - If the file is invalid or non-existent
-    /// - If the length of a line exceeds `WIDTH`
-    /// - If the number of lines exceeds `HEIGHT`
-    pub fn new_from_file(path: &Path) -> Self {
-        let file = match File::open(&path) {
-            Err(why) => panic!("Error opening file{}: {}", path.display(), why),
+    /// - If the length of a line exceeds the width of the first line
+    ///
+    /// # Example:
+    /// ```
+    /// use yagoll::*;
+    ///
+    /// let board = Board::new_from_file("./tests/test-boards/glider.txt");
+    ///
+    /// assert!(board.width == 5 && board.height == 5 && board.border == BorderOpt::Empty);
+    /// assert_eq!(board.get(2, 1), Cell::Alive);
+    /// ```
+    pub fn new_from_file(path: &str) -> Self {
+        let file = match File::open(Path::new(path)) {
+            Err(why) => panic!("Error opening file{}: {}", path, why),
             Ok(file) => file,
         };
-        let mut cells = [[Cell::Dead; WIDTH]; HEIGHT];
+        let mut cells: Vec<Cell> = vec![];
         let mut line_iter = BufReader::new(file).lines();
+        let (mut width, mut height) = (0, 0);
         let border_str = line_iter.next().unwrap().unwrap();
         let border = Self::parse_str_as_border_opt(&border_str).unwrap_or(BorderOpt::Empty);
 
-        line_iter.enumerate().for_each(|(i, l)| {
+        line_iter.enumerate().for_each(|(_i, l)| {
             let l = l.unwrap();
             let l = l.trim();
-            cells[i] = Self::parse_str_as_cells(l);
+            width = if width == 0 { l.len() } else { width };
+            if l.len() != width {
+                panic!("row {} is length {}, expected {}", _i, l.len(), width);
+            }
+            cells.append(&mut Self::parse_str_as_cells(l));
+            height += 1;
         });
 
-        Board { cells, border }
+        Board {
+            width,
+            height,
+            cells,
+            border,
+        }
     }
 
     /// Advance board state by one cycle
     pub fn advance_cycle(&mut self) {
         let mut updates: Vec<(usize, usize, Cell)> = vec![];
 
-        (0..WIDTH).for_each(|x| {
-            (0..HEIGHT).for_each(|y| match (self.cell_should_live(x, y), self.get(x, y)) {
+        (0..self.width).for_each(|x| {
+            (0..self.height).for_each(|y| match (self.cell_should_live(x, y), self.get(x, y)) {
                 (true, Cell::Dead) => updates.push((x, y, Cell::Alive)),
                 (false, Cell::Alive) => updates.push((x, y, Cell::Dead)),
                 _ => (),
@@ -108,7 +140,8 @@ impl<const WIDTH: usize, const HEIGHT: usize> Board<WIDTH, HEIGHT> {
     ///
     /// If `x` or `y` are out of range
     pub fn set(&mut self, x: usize, y: usize, c: Cell) {
-        self.cells[x][y] = c;
+        let idx = self.to_idx(x, y);
+        self.cells[idx] = c;
     }
 
     /// Get cell at `x` and `y`
@@ -117,44 +150,153 @@ impl<const WIDTH: usize, const HEIGHT: usize> Board<WIDTH, HEIGHT> {
     ///
     /// If `x` or `y` are out of range
     pub fn get(&self, x: usize, y: usize) -> Cell {
-        self.cells[x][y]
+        self.cells[self.to_idx(x, y)]
     }
 }
 
-impl<const WIDTH: usize, const HEIGHT: usize> Board<WIDTH, HEIGHT> {
-    fn is_border(&self, x: i32, y: i32) -> bool {
-        (x < 0 || y < 0) || (x >= WIDTH as i32 || y >= HEIGHT as i32)
+impl Board {
+    fn to_idx(&self, x: usize, y: usize) -> usize {
+        if x >= self.width {
+            panic!("out of bounds: width is {} but x is {}", self.width, x);
+        } else if y >= self.height {
+            panic!("out of bounds: height is {} but y is {}", self.height, y);
+        }
+        ((y % self.height) * self.width) + x
+    }
+
+    // ___
+    // _X#
+    // _##
+    fn get_lower_right_neighbors(&self, x: usize, y: usize) -> Vec<Cell> {
+        [
+            &[self.get(x + 1, y)][..],
+            &[self.get(x, y + 1), self.get(x + 1, y + 1)][..],
+        ]
+        .concat()
+        .to_vec()
+    }
+
+    // ###
+    // #X#
+    // ___
+    fn get_upper_neighbors(&self, x: usize, y: usize) -> Vec<Cell> {
+        [
+            &self.cells[self.to_idx(x - 1, y - 1)..self.to_idx(x + 1, y - 1) + 1],
+            &[self.get(x - 1, y), self.get(x + 1, y)][..],
+        ]
+        .concat()
+        .to_vec()
+    }
+
+    // ___
+    // #X#
+    // ###
+    fn get_lower_neighbors(&self, x: usize, y: usize) -> Vec<Cell> {
+        [
+            &[self.get(x - 1, y), self.get(x + 1, y)][..],
+            &self.cells[self.to_idx(x - 1, y + 1)..self.to_idx(x + 1, y + 1) + 1],
+        ]
+        .concat()
+        .to_vec()
+    }
+
+    // _##
+    // _X#
+    // _##
+    fn get_right_neighbors(&self, x: usize, y: usize) -> Vec<Cell> {
+        [
+            &self.cells[self.to_idx(x, y - 1)..self.to_idx(x + 1, y - 1) + 1],
+            &[self.get(x + 1, y)][..],
+            &self.cells[self.to_idx(x, y + 1)..self.to_idx(x + 1, y + 1) + 1],
+        ]
+        .concat()
+        .to_vec()
+    }
+
+    // _##
+    // _X#
+    // ___
+    fn get_upper_right_neighbors(&self, x: usize, y: usize) -> Vec<Cell> {
+        [
+            &[self.get(x, y - 1), self.get(x + 1, y - 1)][..],
+            &[self.get(x + 1, y)][..],
+        ]
+        .concat()
+        .to_vec()
+    }
+
+    // ___
+    // #X_
+    // ##_
+    fn get_lower_left_neighbors(&self, x: usize, y: usize) -> Vec<Cell> {
+        [
+            &[self.get(x - 1, y)][..],
+            &[self.get(x - 1, y + 1), self.get(x, y + 1)][..],
+        ]
+        .concat()
+        .to_vec()
+    }
+
+    // ##_
+    // #X_
+    // ##_
+    fn get_left_neighbors(&self, x: usize, y: usize) -> Vec<Cell> {
+        [
+            &self.cells[self.to_idx(x - 1, y - 1)..self.to_idx(x, y - 1) + 1],
+            &[self.get(x - 1, y)][..],
+            &self.cells[self.to_idx(x - 1, y + 1)..self.to_idx(x, y + 1) + 1],
+        ]
+        .concat()
+        .to_vec()
+    }
+
+    // ##_
+    // #X_
+    // ___
+    fn get_upper_left_neighbors(&self, x: usize, y: usize) -> Vec<Cell> {
+        [
+            &[self.get(x - 1, y - 1), self.get(x, y - 1)][..],
+            &[self.get(x - 1, y)][..],
+        ]
+        .concat()
+        .to_vec()
+    }
+
+    // ###
+    // #X#
+    // ###
+    fn get_all_neighbors(&self, x: usize, y: usize) -> Vec<Cell> {
+        [
+            &self.cells[self.to_idx(x - 1, y - 1)..self.to_idx(x + 1, y - 1) + 1],
+            &[self.get(x - 1, y), self.get(x + 1, y)][..],
+            &self.cells[self.to_idx(x - 1, y + 1)..self.to_idx(x + 1, y + 1) + 1],
+        ]
+        .concat()
+        .to_vec()
+    }
+
+    fn get_neighbors(&self, x: usize, y: usize) -> Vec<Cell> {
+        let w: usize = self.width - 1;
+        let h: usize = self.height - 1;
+
+        match (x, y) {
+            (x, y) if (x > 0 && x < w) && y == h => self.get_upper_neighbors(x, y),
+            (0, y) if y == h => self.get_upper_right_neighbors(x, y),
+            (0, y) if y > 0 && y < h => self.get_right_neighbors(x, y),
+            (0, 0) => self.get_lower_right_neighbors(x, y),
+            (x, 0) if x > 0 && x < w => self.get_lower_neighbors(x, y),
+            (x, 0) if x == w => self.get_lower_left_neighbors(x, y),
+            (x, y) if x == w && (y > 0 && y < h) => self.get_left_neighbors(x, y),
+            (x, y) if x == w && y == h => self.get_upper_left_neighbors(x, y),
+            _ => self.get_all_neighbors(x, y),
+        }
     }
 
     fn get_live_neighbor_count(&self, x: usize, y: usize) -> usize {
-        let cell = self.get(x, y);
-        let x = x as i32;
-        let y = y as i32;
-
-        let mut n = 0;
-
-        // TODO: Refactor this out into another method which retrieves a slice of neighbors
-        (x - 1..x + 2).for_each(|x| {
-            (y - 1..y + 2).for_each(|y| {
-                n += if self.is_border(x, y) {
-                    match self.border {
-                        BorderOpt::Solid => 1,
-                        BorderOpt::Empty => 0,
-                        _ => 0,
-                    }
-                } else if self.get(x as usize, y as usize) == Cell::Alive {
-                    1
-                } else {
-                    0
-                };
-            });
-        });
-
-        if cell == Cell::Alive {
-            n - 1
-        } else {
-            n
-        }
+        self.get_neighbors(x, y)
+            .iter()
+            .filter(|n| **n == Cell::Alive)
+            .count()
     }
 
     fn cell_should_live(&self, x: usize, y: usize) -> bool {
@@ -167,15 +309,15 @@ impl<const WIDTH: usize, const HEIGHT: usize> Board<WIDTH, HEIGHT> {
         }
     }
 
-    fn parse_str_as_cells(string: &str) -> [Cell; WIDTH] {
-        let mut cell_row = [Cell::Dead; WIDTH];
+    fn parse_str_as_cells(string: &str) -> Vec<Cell> {
+        let mut cell_row: Vec<Cell> = vec![];
 
-        string.bytes().enumerate().for_each(|(i, c)| {
-            cell_row[i] = match c {
+        string.bytes().for_each(|c| {
+            cell_row.push(match c {
                 FILE_LIVE_CHAR => Cell::Alive,
                 FILE_DEAD_CHAR => Cell::Dead,
                 _ => Cell::Dead,
-            }
+            })
         });
 
         cell_row
@@ -190,19 +332,20 @@ impl<const WIDTH: usize, const HEIGHT: usize> Board<WIDTH, HEIGHT> {
     }
 }
 
-impl<const WIDTH: usize, const HEIGHT: usize> Default for Board<WIDTH, HEIGHT> {
+impl Default for Board {
     fn default() -> Self {
-        Board::<WIDTH, HEIGHT>::new(BorderOpt::Empty)
+        Board::new(10, 10, BorderOpt::Empty)
     }
 }
 
-impl<const WIDTH: usize, const HEIGHT: usize> Display for Board<WIDTH, HEIGHT> {
+impl Display for Board {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        self.cells.iter().for_each(|x| {
-            x.iter().for_each(|c| {
-                write!(f, "{}", c).unwrap();
-            });
-            writeln!(f).unwrap();
+        self.cells.iter().enumerate().for_each(|(i, c)| {
+            if (i + 1) % self.width == 0 {
+                writeln!(f, "{}", c).unwrap()
+            } else {
+                write!(f, "{}", c).unwrap()
+            }
         });
         write!(f, "")
     }
@@ -217,8 +360,8 @@ mod tests {
     // ░░▓▓░░░░
     // ░░░░▓▓░░
     // ░░░░░░▓▓
-    fn get_4x4_board() -> Board<4, 4> {
-        let mut board = Board::<4, 4>::new(BorderOpt::Empty);
+    fn get_4x4_board() -> Board {
+        let mut board = Board::new(4, 4, BorderOpt::Empty);
 
         board.set(0, 0, Cell::Alive);
         board.set(1, 1, Cell::Alive);
@@ -231,12 +374,12 @@ mod tests {
     // ░░▓▓░░
     // ░░▓▓░░
     // ░░▓▓░░
-    fn get_blinker_board() -> Board<3, 3> {
-        let mut board = Board::<3, 3>::new(BorderOpt::Empty);
+    fn get_blinker_board() -> Board {
+        let mut board = Board::new(3, 3, BorderOpt::Empty);
 
-        board.set(0, 1, Cell::Alive);
+        board.set(1, 0, Cell::Alive);
         board.set(1, 1, Cell::Alive);
-        board.set(2, 1, Cell::Alive);
+        board.set(1, 2, Cell::Alive);
 
         board
     }
@@ -246,8 +389,8 @@ mod tests {
     // ▓▓▓▓▓▓░░░░
     // ░░░░░░░░░░
     // ░░░░░░░░░░
-    fn get_glider_board() -> Board<5, 5> {
-        let mut board = Board::<5, 5>::new(BorderOpt::Empty);
+    fn get_glider_board() -> Board {
+        let mut board = Board::new(5, 5, BorderOpt::Empty);
 
         board.set(0, 1, Cell::Alive);
         board.set(1, 2, Cell::Alive);
@@ -258,32 +401,34 @@ mod tests {
         board
     }
 
-    fn get_rectangular_board() -> Board<5, 3> {
-        let mut board = Board::<5, 3>::new(BorderOpt::Empty);
+    fn get_rectangular_board() -> Board {
+        let mut board = Board::new(5, 3, BorderOpt::Empty);
 
         board.set(1, 1, Cell::Alive);
-        board.set(1, 2, Cell::Alive);
-        board.set(1, 3, Cell::Alive);
+        board.set(2, 1, Cell::Alive);
+        board.set(3, 1, Cell::Alive);
 
         board
     }
 
-    fn get_file_board() -> Board<5, 5> {
-        Board::new_from_file(Path::new("./tests/test-boards/glider.txt"))
+    fn get_file_board() -> Board {
+        Board::new_from_file("./tests/test-boards/glider.txt")
     }
 
-    fn get_bad_file_board() -> Board<3, 3> {
-        Board::new_from_file(Path::new("./tests/test-boards/bad-test.txt"))
+    fn get_bad_file_board() -> Board {
+        Board::new_from_file("./tests/test-boards/bad-test.txt")
     }
 
     #[test]
     fn init_default_board() {
-        let board = Board::<10, 10>::default();
+        let board = Board::default();
         assert_eq!(
             board,
-            Board::<10, 10> {
+            Board {
+                width: 10,
+                height: 10,
                 border: BorderOpt::Empty,
-                cells: [[Cell::Dead; 10]; 10]
+                cells: vec![Cell::Dead; 10 * 10],
             }
         );
     }
@@ -313,7 +458,7 @@ mod tests {
 
         assert_eq!(board_blinker.get_live_neighbor_count(0, 0), 2);
         assert_eq!(board_blinker.get_live_neighbor_count(1, 1), 2);
-        assert_eq!(board_blinker.get_live_neighbor_count(2, 1), 1);
+        assert_eq!(board_blinker.get_live_neighbor_count(2, 1), 3);
     }
 
     #[test]
@@ -358,12 +503,12 @@ mod tests {
         let mut board = get_glider_board();
         let expected = "\
         ░░░░░░░░░░\n\
-        ░░░░░░░░░░\n\
         ░░░░░░▓▓░░\n\
         ░░░░░░░░▓▓\n\
-        ░░░░▓▓▓▓▓▓\n";
+        ░░░░▓▓▓▓▓▓\n\
+        ░░░░░░░░░░\n";
 
-        board.advance_n_cycles(8); // 8 cycles to fully traverse board
+        board.advance_n_cycles(6); // 8 cycles to fully traverse board
 
         println!("Expected:\n{}\nActual:\n{}", expected, board);
         assert_eq!(format!("{}", board), expected.to_string());
@@ -393,8 +538,9 @@ mod tests {
         ░░▓▓▓▓▓▓░░\n\
         ░░░░░░░░░░\n";
 
-        println!("{:?}", board);
+        println!("{:#?}", board);
 
+        assert!(board.height == 5 && board.width == 5);
         assert!(board.border == BorderOpt::Empty);
 
         println!("Expected:\n{}\nActual:\n{}", expected, board);
