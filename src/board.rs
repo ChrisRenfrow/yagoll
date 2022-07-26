@@ -181,7 +181,7 @@ impl Board {
     // ___
     fn get_upper_neighbors(&self, x: usize, y: usize) -> Vec<Cell> {
         [
-            &self.cells[self.to_idx(x - 1, y - 1)..self.to_idx(x + 1, y - 1) + 1],
+            &self.cells[self.to_idx(x - 1, y - 1)..=self.to_idx(x + 1, y - 1)],
             &[self.get(x - 1, y), self.get(x + 1, y)][..],
         ]
         .concat()
@@ -194,7 +194,7 @@ impl Board {
     fn get_lower_neighbors(&self, x: usize, y: usize) -> Vec<Cell> {
         [
             &[self.get(x - 1, y), self.get(x + 1, y)][..],
-            &self.cells[self.to_idx(x - 1, y + 1)..self.to_idx(x + 1, y + 1) + 1],
+            &self.cells[self.to_idx(x - 1, y + 1)..=self.to_idx(x + 1, y + 1)],
         ]
         .concat()
         .to_vec()
@@ -205,9 +205,9 @@ impl Board {
     // _##
     fn get_right_neighbors(&self, x: usize, y: usize) -> Vec<Cell> {
         [
-            &self.cells[self.to_idx(x, y - 1)..self.to_idx(x + 1, y - 1) + 1],
+            &self.cells[self.to_idx(x, y - 1)..=self.to_idx(x + 1, y - 1)],
             &[self.get(x + 1, y)][..],
-            &self.cells[self.to_idx(x, y + 1)..self.to_idx(x + 1, y + 1) + 1],
+            &self.cells[self.to_idx(x, y + 1)..=self.to_idx(x + 1, y + 1)],
         ]
         .concat()
         .to_vec()
@@ -242,9 +242,9 @@ impl Board {
     // ##_
     fn get_left_neighbors(&self, x: usize, y: usize) -> Vec<Cell> {
         [
-            &self.cells[self.to_idx(x - 1, y - 1)..self.to_idx(x, y - 1) + 1],
+            &self.cells[self.to_idx(x - 1, y - 1)..=self.to_idx(x, y - 1)],
             &[self.get(x - 1, y)][..],
-            &self.cells[self.to_idx(x - 1, y + 1)..self.to_idx(x, y + 1) + 1],
+            &self.cells[self.to_idx(x - 1, y + 1)..=self.to_idx(x, y + 1)],
         ]
         .concat()
         .to_vec()
@@ -267,9 +267,9 @@ impl Board {
     // ###
     fn get_all_neighbors(&self, x: usize, y: usize) -> Vec<Cell> {
         [
-            &self.cells[self.to_idx(x - 1, y - 1)..self.to_idx(x + 1, y - 1) + 1],
+            &self.cells[self.to_idx(x - 1, y - 1)..=self.to_idx(x + 1, y - 1)],
             &[self.get(x - 1, y), self.get(x + 1, y)][..],
-            &self.cells[self.to_idx(x - 1, y + 1)..self.to_idx(x + 1, y + 1) + 1],
+            &self.cells[self.to_idx(x - 1, y + 1)..=self.to_idx(x + 1, y + 1)],
         ]
         .concat()
         .to_vec()
